@@ -33,6 +33,7 @@ from dbt.events.types import (
     StateCheckVarsHash,
     Note,
 )
+from dbt.events.helpers import scrub_secrets
 from dbt.logger import DbtProcessState
 from dbt.node_types import NodeType
 from dbt.clients.jinja import get_rendered, MacroStack
@@ -81,6 +82,8 @@ from dbt.parser.sources import SourcePatcher
 from dbt.version import __version__
 
 from dbt.dataclass_schema import StrEnum, dbtClassMixin
+
+from dbt.constants import SECRET_ENV_PREFIX
 
 PARTIAL_PARSE_FILE_NAME = "partial_parse.msgpack"
 PARSING_STATE = DbtProcessState("parsing")
@@ -713,6 +716,9 @@ class ManifestLoader:
         # of env_vars, that would need to change.
         # We are using the parsed cli_vars instead of config.args.vars, in order
         # to sort them and avoid reparsing because of ordering issues.
+        secret_vars = [
+            v for k, v in config.cli_vars.items() if k.startswith(SECRET_ENV_PREFIX) and v.strip()
+        ]
         stringified_cli_vars = pprint.pformat(config.cli_vars)
         vars_hash = FileHash.from_contents(
             "\x00".join(
@@ -727,7 +733,7 @@ class ManifestLoader:
         fire_event(
             StateCheckVarsHash(
                 checksum=vars_hash.checksum,
-                vars=stringified_cli_vars,
+                vars=scrub_secrets(stringified_cli_vars, secret_vars),
                 profile=config.args.profile,
                 target=config.args.target,
                 version=__version__,
