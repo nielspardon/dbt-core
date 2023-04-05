@@ -11,6 +11,7 @@ from dbt.events.types import JinjaLogWarning
 from dbt.events.contextvars import get_node_info
 from dbt.node_types import NodeType
 from dbt.ui import line_wrap_message
+from dbt.constants import SECRET_ENV_PREFIX
 
 import dbt.dataclass_schema
 
@@ -795,7 +796,10 @@ class RequiredVarNotFoundError(CompilationError):
         pretty_vars = json.dumps(dct, sort_keys=True, indent=4)
 
         msg = f"Required var '{self.var_name}' not found in config:\nVars supplied to {node_name} = {pretty_vars}"
-        return msg
+        return scrub_secrets(msg, self.var_secrets())
+
+    def var_secrets(self) -> List[str]:
+        return [v for k, v in self.merged.items() if k.startswith(SECRET_ENV_PREFIX) and v.strip()]
 
 
 class PackageNotFoundForMacroError(CompilationError):
